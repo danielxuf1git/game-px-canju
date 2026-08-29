@@ -95,8 +95,11 @@ export function bootTable(root) {
           0,
           game.slot.findIndex((s) => s.id === tile.id)
         );
-        const dest = view.slotPoint(idx);
-        view.playFly(tile.k, fromX, fromY, dest.x, dest.y, tile.id);
+        if (view.playFlyToSlot) view.playFlyToSlot(tile.k, tile, idx);
+        else {
+          const dest = view.slotPoint(idx);
+          view.playFly(tile.k, fromX, fromY, dest.x, dest.y, tile.id);
+        }
         view.audio.slot();
       }
       if (r.matched && r.matched.length) {

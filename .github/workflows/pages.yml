@@ -23,95 +23,23 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v4
-      - name: Enable Pages
-        continue-on-error: true
+      - name: Prepare site
         run: |
-          curl -sS -X POST \
-            -H "Authorization: Bearer ${{ secrets.GITHUB_TOKEN }}" \
-            -H "Accept: application/vnd.github+json" \
-            -H "X-GitHub-Api-Version: 2022-11-28" \
-            "https://api.github.com/repos/${GITHUB_REPOSITORY}/pages" \
-            -d '{"build_type":"workflow"}' || true
-      - name: Assemble dist root
-        run: |
-          python3 - <<'PY'
-          import base64, gzip, pathlib, shutil, traceback
-          from collections import defaultdict
-
-          def decode_b64(text):
-              return base64.b64decode("".join(text.split()))
-
-          site = pathlib.Path("_site")
-          if site.exists():
-              shutil.rmtree(site)
-          site.mkdir()
-
-          for name in ("index.html", ".nojekyll", "README.md"):
-              p = pathlib.Path(name)
-              if p.is_file():
-                  shutil.copy2(p, site / name)
-          for d in ("src", "public", "pools"):
-              src = pathlib.Path(d)
-              if src.exists():
-                  shutil.copytree(src, site / d, dirs_exist_ok=True)
-
-          try:
-              pool_dir = pathlib.Path(".github/pool")
-              parts = []
-              if pool_dir.exists():
-                  parts = sorted([p for p in pool_dir.iterdir() if p.is_file() and ".gz.b64." in p.name])
-                  if not parts:
-                      single = pool_dir / "official-pool.json.gz.b64"
-                      if single.exists():
-                          parts = [single]
-              if parts:
-                  b64 = "".join("".join(p.read_text().split()) for p in parts)
-                  raw = gzip.decompress(decode_b64(b64)) if any(".gz.b64" in p.name for p in parts) else decode_b64(b64)
-                  if raw[:2] == b"\x1f\x8b":
-                      raw = gzip.decompress(raw)
-                  (site / "pools").mkdir(exist_ok=True)
-                  (site / "pools" / "official-pool.json").write_bytes(raw)
-                  (site / "official-pool.json").write_bytes(raw)
-                  print("pool", len(raw), "from", [p.name for p in parts])
-          except Exception:
-              traceback.print_exc()
-              print("pool assemble failed; continuing")
-
-          src = pathlib.Path(".github/b64")
-          if src.exists():
-              for p in sorted(src.rglob("*.b64")):
-                  if ".b64." in p.name:
-                      continue
-                  try:
-                      dest = site / str(p.relative_to(src))[:-4]
-                      dest.parent.mkdir(parents=True, exist_ok=True)
-                      dest.write_bytes(decode_b64(p.read_text()))
-                      print("wrote", dest, dest.stat().st_size)
-                  except Exception as e:
-                      print("skip", p, e)
-              chunks = defaultdict(list)
-              for p in src.rglob("*"):
-                  if p.is_file() and ".b64." in p.name:
-                      base = p.name.rsplit(".b64.", 1)[0]
-                      dest_rel = p.parent.relative_to(src) / base
-                      chunks[dest_rel].append(p)
-              for dest_rel, files in chunks.items():
-                  try:
-                      files = sorted(files)
-                      b64 = "".join("".join(f.read_text().split()) for f in files)
-                      dest = site / dest_rel
-                      dest.parent.mkdir(parents=True, exist_ok=True)
-                      dest.write_bytes(decode_b64(b64))
-                      print("wrote", dest, dest.stat().st_size, "parts", [f.name for f in files])
-                  except Exception as e:
-                      print("skip chunks", dest_rel, e)
-          print("site ready")
-          for p in sorted(site.rglob("*")):
-              if p.is_file():
-                  print(" ", p.relative_to(site), p.stat().st_size)
-          PY
+          set -eu
+          mkdir -p _site
+          for f in index.html .nojekyll README.md official-pool.json; do
+            [ -f "$f" ] && cp -a "$f" "_site/$f"
+          done
+          for d in src public pools; do
+            [ -d "$d" ] && cp -a "$d" "_site/$d"
+          done
+          echo "site files:"
+          find _site -type f | sort
       - name: Setup Pages
         uses: actions/configure-pages@v5
+        continue-on-error: true
+        with:
+          enablement: true
       - name: Upload artifact
         uses: actions/upload-pages-artifact@v3
         with:
