@@ -4,6 +4,7 @@ import { createFeel } from "./feel.js";
 import { createAudio } from "./audio.js";
 import { createRenderer } from "./renderer.js";
 import { buildChrome } from "./chrome.js";
+import { createFlyer } from "./flyer.js";
 
 function loadImg(src) {
   const im = new Image();
@@ -27,6 +28,7 @@ export function mountView(root, hooks) {
     tiles: [1, 2, 3, 4, 5, 6].map((n) => loadImg(base + "tiles/tile_" + n + ".png")),
   };
   const renderer = createRenderer(ui.canvas, assets, feel);
+  const flyer = createFlyer(root);
 
   let last = 0;
   let demo = !hooks.getState;
@@ -77,6 +79,28 @@ export function mountView(root, hooks) {
       t.tw = tw;
       t.th = th;
     }
+  }
+
+  function slotClient(i) {
+    const n = Math.max(0, Math.min(6, i | 0));
+    const el = ui.slotEls[n];
+    if (el) return flyer.localRect(el);
+    const { W, H } = renderer.size();
+    return { x: 16 + n * ((W - 32) / 7), y: H + 72, w: 44, h: 56 };
+  }
+
+  function tileClient(tile) {
+    const cr = ui.canvas.getBoundingClientRect();
+    const tw = tile.tw || LAYOUT.tileW;
+    const th = tile.th || LAYOUT.tileH;
+    return flyer.localPoint(cr.left + (tile.px || 0), cr.top + (tile.py || 0), tw, th);
+  }
+
+  function playFlyToSlot(k, tile, slotIndex) {
+    const from = tileClient(tile);
+    const to = slotClient(slotIndex);
+    feel.playFly(k, from.x, from.y, to.x, to.y, tile && tile.id);
+    flyer.play(k, from, to, assets);
   }
 
   function slotPoint(i) {
@@ -142,8 +166,7 @@ export function mountView(root, hooks) {
     if (demo) {
       const tx = 24 + (s.slot.length % 7) * 52;
       const ty = renderer.size().H + 40;
-      const dest = slotPoint(s.slot.length - 1);
-      feel.playFly(tile.k, tile.px, tile.py, dest.x, dest.y, tile.id);
+      playFlyToSlot(tile.k, tile, Math.max(0, s.slot.length - 1));
       audio.slot();
       tile.gone = true;
       s.slot.push({ k: tile.k });
@@ -205,8 +228,11 @@ export function mountView(root, hooks) {
     destroy() {
       cancelAnimationFrame(raf);
       ro.disconnect();
+      flyer.destroy();
     },
     slotPoint,
+    slotClient,
+    playFlyToSlot,
     playFly: feel.playFly,
     playMatch: feel.playMatch,
     playBurst: feel.playBurst,
