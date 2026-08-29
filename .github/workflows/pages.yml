@@ -25,20 +25,35 @@ jobs:
         uses: actions/checkout@v4
       - name: Assemble dist root
         run: |
-          mkdir -p pools public/assets/tiles
-          if [ -d .github/pool-parts ]; then
-            cat .github/pool-parts/part0 .github/pool-parts/part1 .github/pool-parts/part2 > pools/official-pool.json
-            cp pools/official-pool.json official-pool.json
-          fi
           python3 - <<'PY'
-          import base64, pathlib
+          import base64, gzip, pathlib
+          from collections import defaultdict
+          pool_b64 = pathlib.Path('.github/pool/official-pool.json.gz.b64')
+          if pool_b64.exists():
+              raw = gzip.decompress(base64.b64decode(''.join(pool_b64.read_text().split())))
+              pathlib.Path('pools').mkdir(exist_ok=True)
+              pathlib.Path('pools/official-pool.json').write_bytes(raw)
+              pathlib.Path('official-pool.json').write_bytes(raw)
+              print('pool', len(raw))
           src = pathlib.Path('.github/b64')
           if src.exists():
               for p in sorted(src.rglob('*.b64')):
-                  rel = p.relative_to(src)
-                  dest = pathlib.Path(str(rel)[:-4])
+                  dest = pathlib.Path(str(p.relative_to(src))[:-4])
                   dest.parent.mkdir(parents=True, exist_ok=True)
                   dest.write_bytes(base64.b64decode(''.join(p.read_text().split())))
+                  print('wrote', dest, dest.stat().st_size)
+              chunks = defaultdict(list)
+              for p in src.rglob('*'):
+                  if p.is_file() and '.b64.' in p.name:
+                      base = p.name.rsplit('.b64.', 1)[0]
+                      dest_rel = p.parent.relative_to(src) / base
+                      chunks[dest_rel].append(p)
+              for dest_rel, files in chunks.items():
+                  files = sorted(files)
+                  b64 = ''.join(''.join(f.read_text().split()) for f in files)
+                  dest = pathlib.Path(dest_rel)
+                  dest.parent.mkdir(parents=True, exist_ok=True)
+                  dest.write_bytes(base64.b64decode(b64))
                   print('wrote', dest, dest.stat().st_size)
           PY
       - name: Setup Pages
