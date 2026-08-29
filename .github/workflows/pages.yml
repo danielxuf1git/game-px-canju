@@ -1,49 +1,93 @@
 name: Deploy GitHub Pages
-
 on:
   push:
     branches: [main]
   workflow_dispatch:
-
 permissions:
   contents: read
   pages: write
   id-token: write
-
-concurrency:
-  group: pages
-  cancel-in-progress: false
-
 jobs:
   deploy:
-    environment:
-      name: github-pages
-      url: ${{ steps.deployment.outputs.page_url }}
     runs-on: ubuntu-latest
     steps:
-      - name: Checkout
-        uses: actions/checkout@v4
-      - name: Prepare site
-        run: |
-          set -eu
-          mkdir -p _site
-          for f in index.html .nojekyll README.md official-pool.json; do
-            [ -f "$f" ] && cp -a "$f" "_site/$f"
-          done
-          for d in src public pools; do
-            [ -d "$d" ] && cp -a "$d" "_site/$d"
-          done
-          echo "site files:"
-          find _site -type f | sort
-      - name: Setup Pages
-        uses: actions/configure-pages@v5
+      - uses: actions/checkout@v4
+      - name: Enable Pages
         continue-on-error: true
-        with:
-          enablement: true
-      - name: Upload artifact
-        uses: actions/upload-pages-artifact@v3
+        run: |
+          curl -sS -X POST -H "Authorization: Bearer ${{ github.token }}" -H "Accept: application/vnd.github+json" "https://api.github.com/repos/${GITHUB_REPOSITORY}/pages" -d '{"build_type":"workflow"}' || true
+      - name: Build site
+        run: |
+          mkdir -p _site
+          cp -a index.html _site/ || true
+          test -f .nojekyll && cp -a .nojekyll _site/ || true
+          test -d src && cp -a src _site/
+          test -d public && cp -a public _site/
+          test -d pools && cp -a pools _site/ || mkdir -p _site/pools
+          python3 - <<'PY'
+          import base64, gzip, pathlib, traceback
+          from collections import defaultdict
+          def dec(t):
+              return base64.b64decode("".join(t.split()))
+          site = pathlib.Path("_site")
+          FIX = {
+            "official-pool.json.gz.b64.00": {582:"7",585:"0",4022:"5",4159:"P"},
+            "official-pool.json.gz.b64.01": {2258:"3",4714:"7",5826:"9",5829:"Q"},
+            "official-pool.json.gz.b64.02": {1865:"r",4233:"/",4470:"7",4581:"2",5013:"W",5782:"E",5785:"v"},
+          }
+          try:
+              pd = pathlib.Path(".github/pool")
+              parts = sorted(p for p in pd.iterdir() if p.is_file() and ".gz.b64." in p.name) if pd.exists() else []
+              if parts:
+                  chunks = []
+                  for p in parts:
+                      s = "".join(p.read_text().split())
+                      fx = FIX.get(p.name, {})
+                      if fx:
+                          L = list(s)
+                          for i,c in fx.items():
+                              if i < len(L):
+                                  L[i] = c
+                          s = "".join(L)
+                      chunks.append(s)
+                  raw = gzip.decompress(dec("".join(chunks)))
+                  (site/"pools").mkdir(exist_ok=True)
+                  (site/"pools"/"official-pool.json").write_bytes(raw)
+                  print("pool", len(raw))
+          except Exception:
+              traceback.print_exc()
+          src = pathlib.Path(".github/b64")
+          if src.exists():
+              for p in sorted(src.rglob("*.b64")):
+                  if ".b64." in p.name:
+                      continue
+                  try:
+                      dest = site / str(p.relative_to(src))[:-4]
+                      dest.parent.mkdir(parents=True, exist_ok=True)
+                      dest.write_bytes(dec(p.read_text()))
+                      print("wrote", dest, dest.stat().st_size)
+                  except Exception as e:
+                      print("skip", p, e)
+              chunks = defaultdict(list)
+              for p in src.rglob("*"):
+                  if p.is_file() and ".b64." in p.name:
+                      chunks[p.parent.relative_to(src) / p.name.rsplit(".b64.",1)[0]].append(p)
+              for dest_rel, files in chunks.items():
+                  try:
+                      files = sorted(files)
+                      dest = site / dest_rel
+                      dest.parent.mkdir(parents=True, exist_ok=True)
+                      dest.write_bytes(dec("".join("".join(f.read_text().split()) for f in files)))
+                      print("wrote", dest, dest.stat().st_size)
+                  except Exception as e:
+                      print("skip", dest_rel, e)
+          print("ok", [str(p.relative_to(site)) for p in sorted(site.rglob("*")) if p.is_file()][:30])
+          PY
+          test -f _site/index.html
+          test -f _site/src/view/table.html
+      - uses: actions/configure-pages@v5
+        continue-on-error: true
+      - uses: actions/upload-pages-artifact@v3
         with:
           path: _site
-      - name: Deploy to GitHub Pages
-        id: deployment
-        uses: actions/deploy-pages@v4
+      - uses: actions/deploy-pages@v4
