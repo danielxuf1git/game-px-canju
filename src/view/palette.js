@@ -14,12 +14,12 @@ export const KINDS = [
   { name: "蜡印", fill: PALETTE.WaxRed, ink: PALETTE.Bone },
   { name: "封条", fill: PALETTE.StampBlue, ink: PALETTE.Bone },
   { name: "邮戳", fill: PALETTE.WaxGreen, ink: PALETTE.Bone },
-  { name: "封缏", fill: PALETTE.Gold, ink: PALETTE.Ink },
+  { name: "封缄", fill: PALETTE.Gold, ink: PALETTE.Ink },
   { name: "标签", fill: PALETTE.KraftDeep, ink: PALETTE.Bone },
   { name: "圆环", fill: PALETTE.Bone, ink: PALETTE.Ink },
 ];
 
-export const NAMES = ["夜班", "封蜡", "秤砬", "邮差", "油灯", "铜钮", "旧秤", "墨匮"];
+export const NAMES = ["夜班", "封蜡", "秤砣", "邮差", "油灯", "铜钮", "旧秤", "墨匣"];
 
 export const LAYOUT = {
   W: 390,

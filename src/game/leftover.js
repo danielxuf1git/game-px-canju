@@ -45,7 +45,7 @@ export function serializeLeftover(state) {
   const src = state.parcel || {};
   return {
     id: newParcelId(),
-    from: src.from || '夜班秤砬',
+    from: src.from || '夜班秤砣',
     solvable: false,
     hate: computeHate(tiles),
     w: src.w,
