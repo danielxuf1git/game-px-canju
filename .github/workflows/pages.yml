@@ -23,6 +23,24 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v4
+      - name: Assemble dist root
+        run: |
+          mkdir -p pools public/assets/tiles
+          if [ -d .github/pool-parts ]; then
+            cat .github/pool-parts/part0 .github/pool-parts/part1 .github/pool-parts/part2 > pools/official-pool.json
+            cp pools/official-pool.json official-pool.json
+          fi
+          python3 - <<'PY'
+          import base64, pathlib
+          src = pathlib.Path('.github/b64')
+          if src.exists():
+              for p in sorted(src.rglob('*.b64')):
+                  rel = p.relative_to(src)
+                  dest = pathlib.Path(str(rel)[:-4])
+                  dest.parent.mkdir(parents=True, exist_ok=True)
+                  dest.write_bytes(base64.b64decode(''.join(p.read_text().split())))
+                  print('wrote', dest, dest.stat().st_size)
+          PY
       - name: Setup Pages
         uses: actions/configure-pages@v5
       - name: Upload artifact
