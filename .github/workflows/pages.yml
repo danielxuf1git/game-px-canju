@@ -54,6 +54,7 @@ jobs:
                   for site in roots:
                       (site/"pools").mkdir(exist_ok=True)
                       (site/"pools"/"official-pool.json").write_bytes(raw)
+                      (site/"official-pool.json").write_bytes(raw)
                   print("pool", len(raw))
           except Exception:
               traceback.print_exc()
@@ -101,6 +102,8 @@ jobs:
           git push || true
       - uses: actions/configure-pages@v5
         continue-on-error: true
+        with:
+          enablement: true
       - uses: actions/upload-pages-artifact@v3
         continue-on-error: true
         with:
