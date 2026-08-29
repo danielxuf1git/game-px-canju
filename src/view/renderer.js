@@ -52,13 +52,6 @@ export function createRenderer(canvas, assets, feel) {
       if (t.flashA) t.flashA *= 0.7;
     }
 
-    for (const f of feel.flying) {
-      const p = feel.flyPos(f);
-      drawTile(ctx, p.x, p.y, TW * 0.85, TH * 0.85, f.k, {
-        asset: assets.tiles && assets.tiles[f.k],
-      });
-    }
-
     if (feel.particlesOn()) {
       for (const p of feel.parts) {
         if (p.life <= 0) continue;

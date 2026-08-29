@@ -139,3 +139,19 @@ html, body {
   z-index: 9;
 }
 .px-land.show { display: flex; }
+
+.px-app { position: relative; }
+.px-fly-layer {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  z-index: 8;
+  overflow: visible;
+}
+.px-fly {
+  position: absolute;
+  left: 0;
+  top: 0;
+  pointer-events: none;
+  transform-origin: top left;
+}
